@@ -9,6 +9,7 @@ import { MatchOrderDto } from '@src/modules/orderbook/dto/match-order.dto';
 import { GetOrdersQueryDto } from '@src/modules/orderbook/dto/get-orders-query.dto';
 import { GetMatchingOrdersQueryDto } from '@src/modules/orderbook/dto/get-matching-orders-query.dto';
 import { GetOrdersDto } from '@src/modules/orderbook/dto/get-orders.dto';
+import { OrderbookConstants } from '@src/modules/orderbook/constants/orderbook.constants';
 
 @Injectable()
 export class OrderbookService implements OnModuleInit {
@@ -16,6 +17,7 @@ export class OrderbookService implements OnModuleInit {
         @InjectRepository(OrderRepository)
         private readonly orderRepository: OrderRepository,
     ) {}
+    private orderEventsList = [];
 
     async onModuleInit() {
         await this.orderRepository.deleteOrdersFromDB();
@@ -23,32 +25,26 @@ export class OrderbookService implements OnModuleInit {
         const web3 = new Web3(process.env.INFURA_URL);
         const contract = new web3.eth.Contract(abi as never, process.env.CONTRACT_ADDRESS);
 
-        console.log('Wait for getting events...');
         contract.events
-            .OrderCreated({
+            .allEvents({
                 fromBlock: 0,
             })
+            .on('connected', () => {
+                console.log('Wait for getting events...');
+
+                setInterval(() => {
+                    return this.handleOrderEvents.call(this);
+                }, OrderbookConstants.START_HANDLE_ORDER_EVENTS_TIME);
+            })
             .on('data', (order) => {
-                return this.createOrder(order);
+                if (
+                    order.event === OrderbookConstants.ORDER_CREATED ||
+                    order.event === OrderbookConstants.ORDER_MATCHED ||
+                    order.event === OrderbookConstants.ORDER_CANCELLED
+                ) {
+                    this.orderEventsList.push(order);
+                }
             });
-
-        setTimeout(() => {
-            contract.events
-                .OrderMatched({
-                    fromBlock: 0,
-                })
-                .on('data', (order) => {
-                    return this.matchOrder(order);
-                });
-
-            contract.events
-                .OrderCancelled({
-                    fromBlock: 0,
-                })
-                .on('data', (order) => {
-                    return this.cancelOrder(order.returnValues?.id);
-                });
-        }, 7000);
     }
 
     async getOrders(query: GetOrdersQueryDto): Promise<GetOrdersDto[]> {
@@ -84,5 +80,22 @@ export class OrderbookService implements OnModuleInit {
 
     private async cancelOrder(id: string): Promise<void> {
         return this.orderRepository.cancelOrder(id);
+    }
+
+    private async handleOrderEvents(): Promise<void> {
+        while (this.orderEventsList.length !== 0) {
+            const orderEvent = this.orderEventsList.shift();
+            switch (orderEvent.event) {
+                case OrderbookConstants.ORDER_CREATED:
+                    await this.createOrder(orderEvent);
+                    break;
+                case OrderbookConstants.ORDER_MATCHED:
+                    await this.matchOrder(orderEvent);
+                    break;
+                case OrderbookConstants.ORDER_CANCELLED:
+                    await this.cancelOrder(orderEvent.returnValues?.id);
+                    break;
+            }
+        }
     }
 }
