@@ -9,6 +9,7 @@ module.exports = [
     database: process.env.API_DB_NAME,
     entities: ['dist/**/*.entity.js'],
     migrations: ['dist/migration/**/*.js'],
+    migrationsRun: true,
     cli: {
       migrationsDir: 'migration',
     },

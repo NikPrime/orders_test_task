@@ -15,5 +15,6 @@ export default (): ConfigType => ({
         database: process.env.API_DB_NAME,
         autoLoadEntities: true,
         migrations: ['dist/migration/*.js'],
+        migrationsRun: true,
     },
 });

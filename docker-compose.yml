@@ -1,0 +1,22 @@
+version: '3.0'
+services:
+  api:
+    container_name: api
+    restart: always
+    build: .
+    environment:
+      - API_DB_HOST=db
+    ports:
+      - ${API_PORT}:${API_PORT}
+    depends_on:
+      - db
+
+  db:
+    container_name: postgres
+    image: postgres
+    ports:
+      - '5433:${API_DB_PORT}'
+    environment:
+      - POSTGRES_PASSWORD=${API_DB_PASSWORD}
+      - POSTGRES_DB=${API_DB_NAME}
+      - POSTGRES_USER=${API_DB_USERNAME}
