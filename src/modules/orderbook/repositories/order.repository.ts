@@ -5,6 +5,7 @@ import { plainToInstance } from 'class-transformer';
 import { GetOrdersDto } from '@src/modules/orderbook/dto/get-orders.dto';
 import { GetOrdersMapperDto } from '@src/modules/orderbook/dto/get-orders-mapper.dto';
 import { GetMatchingOrdersQueryDto } from '@src/modules/orderbook/dto/get-matching-orders-query.dto';
+import { GetMatchingOrdersDBQueryType } from '@src/modules/orderbook/types/orderbook.types';
 
 @EntityRepository(OrderEntity)
 export class OrderRepository extends Repository<OrderEntity> {
@@ -13,8 +14,8 @@ export class OrderRepository extends Repository<OrderEntity> {
 
         if (commonQuery.tokenA) query.tokenA = commonQuery.tokenA;
         if (commonQuery.tokenB) query.tokenB = commonQuery.tokenB;
-        if (commonQuery.active) query.isActive = commonQuery.active;
         if (commonQuery.user) query.user = commonQuery.user;
+        if (typeof commonQuery.active === 'boolean') query.isActive = commonQuery.active;
 
         const orders = await this.find({
             where: query,
@@ -25,7 +26,15 @@ export class OrderRepository extends Repository<OrderEntity> {
         return plainToInstance(GetOrdersDto, orders);
     }
 
-    async getMatchingOrders(query: GetMatchingOrdersQueryDto): Promise<string[]> {
+    async getMatchingOrders(commonQuery: GetMatchingOrdersQueryDto): Promise<string[]> {
+        const query: GetMatchingOrdersDBQueryType = {};
+
+        // looking for opposite orders
+        query.tokenA = commonQuery.tokenB;
+        query.tokenB = commonQuery.tokenA;
+        if (commonQuery.amountA) query.amountA = commonQuery.amountB;
+        if (commonQuery.amountB) query.amountB = commonQuery.amountA;
+
         const orders = await this.find({
             where: query,
             select: ['id'],
@@ -59,6 +68,9 @@ export class OrderRepository extends Repository<OrderEntity> {
     }
 
     async cancelOrder(id: string): Promise<void> {
+        const order = await this.findOne(id);
+        if (!order || !order.isActive) return;
+
         const cancelledOrder = await this.save({
             id,
             isActive: false,

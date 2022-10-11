@@ -1,4 +1,4 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 import { IPaginationQueryDto, PaginationQueryDto } from '@src/common/pagination/pagination.dto';
 
@@ -29,5 +29,9 @@ export class GetOrdersQueryDto extends PaginationQueryDto implements IGetOrdersQ
     @Expose()
     @IsBoolean()
     @IsOptional()
+    @Transform(({ value }) => {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+    })
     active?: boolean;
 }
